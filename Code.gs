@@ -1029,13 +1029,38 @@ function getAllFarmersByLong(longName, sessionToken) {
     if (!sheet || sheet.getLastRow() <= 1) return { success: true, message: "ไม่พบข้อมูลเกษตรกร", data: [] };
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
-    const longIndex = headers.indexOf('ตัวแทนที่สังกัด');
-    if (longIndex === -1) return { success: false, message: "ไม่พบคอลัมน์ ตัวแทนที่สังกัด", data: [] };
+    
+    // Log headers for debugging
+    Logger.log('getAllFarmersByLong headers: ' + JSON.stringify(headers));
+    
+    // Flexible header matching - check multiple possible column names
+    let longIndex = headers.indexOf('ตัวแทนที่สังกัด');
+    if (longIndex === -1) longIndex = headers.indexOf('ล้งที่สังกัด');
+    if (longIndex === -1) longIndex = headers.indexOf('ตัวแทน');
+    if (longIndex === -1) longIndex = headers.indexOf('ล้ง');
+    if (longIndex === -1) longIndex = headers.indexOf('Long');
+    if (longIndex === -1) longIndex = headers.indexOf('long_name');
+    
+    // Try findHeaderIndexFlexible as last resort
+    if (longIndex === -1) {
+      longIndex = findHeaderIndexFlexible(sheet, ['ตัวแทนที่สังกัด', 'ล้งที่สังกัด', 'ตัวแทน', 'ล้ง']);
+    }
+    
+    if (longIndex === -1) {
+      Logger.log('getAllFarmersByLong: Could not find long column. Available headers: ' + JSON.stringify(headers));
+      return { success: false, message: "ไม่พบคอลัมน์ ตัวแทนที่สังกัด (Headers: " + headers.slice(0, 5).join(', ') + "...)", data: [] };
+    }
+    
     const farmers = [];
+    // requestLongNorm already declared above at line 1011
+    
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       const rowLong = String(row[longIndex] || '').trim();
-      if (rowLong === longName) {
+      const rowLongNorm = normalizeLongName(rowLong);
+      
+      // Match both original and normalized values
+      if (rowLong === longName || rowLongNorm === requestLongNorm) {
         const obj = {};
         headers.forEach((h, idx) => obj[h] = row[idx]);
         farmers.push(obj);

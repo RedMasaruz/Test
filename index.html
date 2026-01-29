@@ -1760,8 +1760,10 @@
 
             <!-- Forms Modal/Overlay -->
             <div id="delivery-form-overlay"
-                class="fixed inset-0 z-50 flex items-center justify-center hidden bg-black bg-opacity-50 overflow-y-auto">
-                <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 my-8 overflow-hidden relative">
+                class="fixed inset-0 z-50 flex items-center justify-center hidden bg-black bg-opacity-50 overflow-y-auto"
+                onclick="if(event.target === this) closeDeliveryForm()">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 my-8 overflow-hidden relative"
+                    onclick="event.stopPropagation()">
                     <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                         <h3 id="delivery-form-title" class="text-lg font-bold text-gray-800">บันทึกขั้นตอน</h3>
                         <button onclick="closeDeliveryForm()" class="text-gray-400 hover:text-gray-600">
@@ -7503,7 +7505,11 @@
             }
 
             function closeDeliveryForm() {
-                document.getElementById('delivery-form-overlay').classList.add('hidden');
+                const overlay = document.getElementById('delivery-form-overlay');
+                overlay.classList.add('hidden');
+                // Reset form content to prevent stale data
+                const content = document.getElementById('delivery-form-content');
+                if (content) content.innerHTML = '';
             }
 
             function submitDeliveryForm() {
@@ -7512,6 +7518,10 @@
 
                 // Basic Frontend Validation
                 const form = document.querySelector('#delivery-form-content form');
+                if (!form) {
+                    showCustomAlert('❌ ไม่พบฟอร์ม กรุณาลองใหม่อีกครั้ง', 'danger');
+                    return;
+                }
                 if (!form.reportValidity()) return;
 
                 const formData = new FormData(form);
@@ -7710,35 +7720,52 @@
                 select.innerHTML = '<option value="">กำลังโหลด...</option>';
 
                 google.script.run
-                    .withSuccessHandler(res => {
+                    .withSuccessHandler(result => {
                         select.innerHTML = '<option value="">-- เลือกเกษตรกร --</option>';
-                        if (res.success && res.data && res.data.length > 0) {
-                            res.data.forEach(f => {
-                                const key = f.farmer_id;
-                                const name = f.farmer_name_main || key;
 
-                                const opt = document.createElement('option');
-                                opt.value = key;
-                                opt.textContent = `${name} (${key})`;
-                                opt.dataset.name = name;
-                                select.appendChild(opt);
+                        // Parse result (getAllFarmersByLong returns JSON string)
+                        let data;
+                        try {
+                            data = typeof result === 'string' ? JSON.parse(result) : result;
+                        } catch (e) {
+                            data = result;
+                        }
+
+                        if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
+                            data.data.forEach(f => {
+                                // Keys from Sheet A (Thai headers)
+                                const key = f['รหัสเกษตรกร'] || f['a-id'] || '';
+                                const name = f['ชื่อ-นามสกุล'] || f['a-fullname'] || key;
+
+                                if (key) {
+                                    const opt = document.createElement('option');
+                                    opt.value = key;
+                                    opt.textContent = `${name} (${key})`;
+                                    opt.dataset.name = name;
+                                    select.appendChild(opt);
+                                }
                             });
 
-                            select.addEventListener('change', (e) => {
+                            // Use onchange attribute instead of addEventListener to prevent duplicate listeners
+                            select.onchange = function () {
                                 const nameInput = document.getElementById('dl-farmer-name');
-                                const selectedOpt = select.options[select.selectedIndex];
-                                if (nameInput && selectedOpt) nameInput.value = selectedOpt.dataset.name || '';
-                            });
+                                const selectedOpt = this.options[this.selectedIndex];
+                                if (nameInput) {
+                                    // Reset farmer_name if empty option is selected
+                                    nameInput.value = (selectedOpt && selectedOpt.value) ? (selectedOpt.dataset.name || '') : '';
+                                }
+                            };
                         } else {
-                            // No farmers found in Sheet B
-                            select.innerHTML = '<option value="">ไม่พบเกษตรกรที่มีข้อมูลในระบบ</option>';
-                            showCustomAlert('ไม่พบเกษตรกรที่มีการบันทึก "ข้อมูลการใช้แร่และนาโน" กรุณาบันทึกข้อมูลเกษตรกรก่อนเปิด Lot', 'warning');
+                            // No farmers found in Sheet A
+                            select.innerHTML = '<option value="">ไม่พบเกษตรกรที่ลงทะเบียนในระบบ</option>';
+                            showCustomAlert('ไม่พบเกษตรกรที่ลงทะเบียน กรุณาเพิ่มข้อมูลเกษตรกรในหน้า "ข้อมูลการสำรวจจริง" ก่อน', 'warning');
                         }
                     })
                     .withFailureHandler(e => {
                         select.innerHTML = '<option>โหลดล้มเหลว</option>';
+                        console.error('populateFarmersDropdownForDelivery error:', e);
                     })
-                    .getFarmersWithSheetBRecords(longName, token);
+                    .getAllFarmersByLong(longName, token);
             }
 
             function openLotAction(lotId, currentState) {

@@ -7472,7 +7472,7 @@
                 }
 
                 let html = '';
-                lots.forEach(lot => {
+                lots.filter(lot => lot.state !== 'MERGED').forEach(lot => {
                     const stateDisplay = LOT_STATES[lot.state] || lot.state;
                     const dateDisplay = new Date(lot.updated_at).toLocaleDateString('th-TH', {
                         year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'

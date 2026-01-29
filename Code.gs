@@ -2413,6 +2413,7 @@ function updateMultipleLotState(data, sessionToken) {
     const combinedData = {
       source_lots: lotIds,
       source_farmers: [...new Set(farmerNames)].join(', '),
+      farmer_name: [...new Set(farmerNames)].join(', '),
       combined_qty_from_sources: totalQty,
       created_by: session.username,
       cleaning_operator: data.cleaning_operator,

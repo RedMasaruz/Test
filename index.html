@@ -7718,10 +7718,14 @@
                 const longName = sessionStorage.getItem('longName');
                 const select = document.getElementById(selectId);
 
+                console.log('📋 populateFarmersDropdownForDelivery called with:', { selectId, longName, token: token ? 'present' : 'missing' });
+
                 select.innerHTML = '<option value="">กำลังโหลด...</option>';
 
                 google.script.run
                     .withSuccessHandler(result => {
+                        console.log('📋 getAllFarmersByLong raw result:', result);
+
                         select.innerHTML = '<option value="">-- เลือกเกษตรกร --</option>';
 
                         // Parse result (getAllFarmersByLong returns JSON string)
@@ -7729,14 +7733,25 @@
                         try {
                             data = typeof result === 'string' ? JSON.parse(result) : result;
                         } catch (e) {
+                            console.error('📋 JSON parse error:', e);
                             data = result;
                         }
 
+                        console.log('📋 Parsed data:', data);
+                        console.log('📋 data.success:', data?.success);
+                        console.log('📋 data.data:', data?.data);
+                        console.log('📋 Is array:', Array.isArray(data?.data));
+                        console.log('📋 Length:', data?.data?.length);
+
                         if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
+                            console.log('📋 First farmer record:', data.data[0]);
+
                             data.data.forEach(f => {
                                 // Keys from Sheet A (Thai headers)
                                 const key = f['รหัสเกษตรกร'] || f['a-id'] || '';
                                 const name = f['ชื่อ-นามสกุล'] || f['a-fullname'] || key;
+
+                                console.log('📋 Farmer:', { key, name, rawKeys: Object.keys(f) });
 
                                 if (key) {
                                     const opt = document.createElement('option');
@@ -7758,13 +7773,14 @@
                             };
                         } else {
                             // No farmers found in Sheet A
+                            console.warn('📋 No farmers found or invalid data structure');
                             select.innerHTML = '<option value="">ไม่พบเกษตรกรที่ลงทะเบียนในระบบ</option>';
                             showCustomAlert('ไม่พบเกษตรกรที่ลงทะเบียน กรุณาเพิ่มข้อมูลเกษตรกรในหน้า "ข้อมูลการสำรวจจริง" ก่อน', 'warning');
                         }
                     })
                     .withFailureHandler(e => {
+                        console.error('📋 populateFarmersDropdownForDelivery failure:', e);
                         select.innerHTML = '<option>โหลดล้มเหลว</option>';
-                        console.error('populateFarmersDropdownForDelivery error:', e);
                     })
                     .getAllFarmersByLong(longName, token);
             }

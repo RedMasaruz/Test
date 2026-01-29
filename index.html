@@ -7714,9 +7714,18 @@
             }
 
             function populateFarmersDropdownForDelivery(selectId) {
-                const token = sessionStorage.getItem('sessionToken');
-                const longName = sessionStorage.getItem('longName');
+                const currentUser = checkLoginStatus();
                 const select = document.getElementById(selectId);
+
+                if (!currentUser) {
+                    console.warn('📋 User not logged in');
+                    select.innerHTML = '<option value="">กรุณาล็อกอินก่อน</option>';
+                    showCustomAlert('กรุณาล็อกอินก่อนใช้งาน', 'warning');
+                    return;
+                }
+
+                const longName = currentUser.longName;
+                const token = currentUser.token;
 
                 console.log('📋 populateFarmersDropdownForDelivery called with:', { selectId, longName, token: token ? 'present' : 'missing' });
 
@@ -7728,14 +7737,8 @@
 
                         select.innerHTML = '<option value="">-- เลือกเกษตรกร --</option>';
 
-                        // Parse result (getAllFarmersByLong returns JSON string)
-                        let data;
-                        try {
-                            data = typeof result === 'string' ? JSON.parse(result) : result;
-                        } catch (e) {
-                            console.error('📋 JSON parse error:', e);
-                            data = result;
-                        }
+                        // Use safeParseJSON like fetchSummaryData does
+                        const data = safeParseJSON(result);
 
                         console.log('📋 Parsed data:', data);
                         console.log('📋 data.success:', data?.success);
@@ -7767,13 +7770,12 @@
                                 const nameInput = document.getElementById('dl-farmer-name');
                                 const selectedOpt = this.options[this.selectedIndex];
                                 if (nameInput) {
-                                    // Reset farmer_name if empty option is selected
                                     nameInput.value = (selectedOpt && selectedOpt.value) ? (selectedOpt.dataset.name || '') : '';
                                 }
                             };
                         } else {
                             // No farmers found in Sheet A
-                            console.warn('📋 No farmers found or invalid data structure');
+                            console.warn('📋 No farmers found or invalid data structure. Message:', data?.message);
                             select.innerHTML = '<option value="">ไม่พบเกษตรกรที่ลงทะเบียนในระบบ</option>';
                             showCustomAlert('ไม่พบเกษตรกรที่ลงทะเบียน กรุณาเพิ่มข้อมูลเกษตรกรในหน้า "ข้อมูลการสำรวจจริง" ก่อน', 'warning');
                         }

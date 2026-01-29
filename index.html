@@ -2378,7 +2378,9 @@
             function updateBackButton(viewId) {
                 const backButton = document.getElementById('back-button');
                 if (backButton) {
-                    if (viewId === 'main-menu-view' || viewId === 'submenu-view') {
+                    // Hide back button for main-menu, submenu, and views accessed from submenu
+                    const hideBackViews = ['main-menu-view', 'submenu-view', 'sheet-a-view', 'delivery-system-view', 'sheet-c-view'];
+                    if (hideBackViews.includes(viewId)) {
                         backButton.classList.add('hidden');
                     } else {
                         backButton.classList.remove('hidden');

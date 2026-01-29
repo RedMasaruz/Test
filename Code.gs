@@ -2327,7 +2327,7 @@ function updateLotState(lotId, newState, data, sessionToken) {
 }
 
 /**
- * Update multiple lots to the same state (for combined cleaning)
+ * Merge multiple SORTED lots into one COMBINED lot for cleaning
  * @param {Object} data - Contains lot_ids array and cleaning data
  * @param {string} sessionToken - The session token
  */
@@ -2338,7 +2338,7 @@ function updateMultipleLotState(data, sessionToken) {
     
     const lotIds = data.lot_ids;
     if (!lotIds || !Array.isArray(lotIds) || lotIds.length === 0) {
-      throw new Error('ไม่พบรายการ Lot ที่ต้องการอัปเดต');
+      throw new Error('ไม่พบรายการ Lot ที่ต้องการรวม');
     }
     
     const sheet = getLotsSheet();
@@ -2348,15 +2348,25 @@ function updateMultipleLotState(data, sessionToken) {
     
     const idxId = headers.indexOf('lot_id');
     const idxState = headers.indexOf('state');
+    const idxAgentId = headers.indexOf('agent_id');
+    const idxFarmerId = headers.indexOf('farmer_id');
     const idxData = headers.indexOf('data_json');
     const idxHistory = headers.indexOf('history_json');
     const idxUpdated = headers.indexOf('updated_at');
     
     const now = new Date();
-    const newState = 'CLEANED';
-    const cleaningBatchId = `BATCH-${now.getTime()}`;
     
-    let updatedCount = 0;
+    // Generate new combined lot ID
+    const dateStr = Utilities.formatDate(now, "GMT+7", "yyyyMMdd");
+    const uniquePart = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const combinedLotId = `LOT-${dateStr}-CMB-${uniquePart}`;
+    
+    // Collect data from all source lots
+    let sourceLots = [];
+    let totalQty = 0;
+    let farmerNames = [];
+    let farmerIds = [];
+    let agentId = '';
     
     for (let i = 1; i < values.length; i++) {
       const lotId = String(values[i][idxId]);
@@ -2364,56 +2374,69 @@ function updateMultipleLotState(data, sessionToken) {
       if (lotIds.includes(lotId)) {
         const rowIndex = i + 1;
         
-        // Get current data
         let currentData = {};
         try { currentData = JSON.parse(values[i][idxData] || '{}'); } catch(e) {}
         
-        // Get current history
         let history = [];
         try { history = JSON.parse(values[i][idxHistory] || '[]'); } catch(e) {}
         
-        // Merge cleaning data
-        const updatedData = {
-          ...currentData,
-          cleaning_batch_id: cleaningBatchId,
-          cleaning_operator: data.cleaning_operator,
-          cleaning_method: data.cleaning_method,
-          cleaning_qty_per_round: data.cleaning_qty_per_round,
-          cleaning_time_per_round: data.cleaning_time_per_round,
-          cleaning_round_count: data.cleaning_round_count,
-          cleaning_end_time: data.cleaning_end_time
-        };
+        sourceLots.push({ lotId, rowIndex, data: currentData, history });
         
-        // Add to history
+        if (currentData.qty_sorted_remaining) {
+          totalQty += parseFloat(currentData.qty_sorted_remaining) || 0;
+        } else if (currentData.qty_harvested) {
+          totalQty += parseFloat(currentData.qty_harvested) || 0;
+        }
+        
+        if (currentData.farmer_name) farmerNames.push(currentData.farmer_name);
+        if (values[i][idxFarmerId]) farmerIds.push(values[i][idxFarmerId]);
+        if (!agentId && values[i][idxAgentId]) agentId = values[i][idxAgentId];
+        
         history.push({
-          state: newState,
+          state: 'MERGED',
           timestamp: now.getTime(),
           user: session.username,
-          action: 'combined_cleaning',
-          batch_id: cleaningBatchId,
-          batch_lots: lotIds,
-          details: data
+          action: 'merged_to_combined',
+          combined_lot_id: combinedLotId
         });
         
-        // Update row
-        sheet.getRange(rowIndex, idxState + 1).setValue(newState);
-        sheet.getRange(rowIndex, idxData + 1).setValue(JSON.stringify(updatedData));
+        sheet.getRange(rowIndex, idxState + 1).setValue('MERGED');
         sheet.getRange(rowIndex, idxHistory + 1).setValue(JSON.stringify(history));
         sheet.getRange(rowIndex, idxUpdated + 1).setValue(now);
-        
-        updatedCount++;
       }
     }
     
-    if (updatedCount === 0) {
+    if (sourceLots.length === 0) {
       throw new Error('ไม่พบ Lot ที่ตรงกับรายการที่ระบุ');
     }
     
+    const combinedData = {
+      source_lots: lotIds,
+      source_farmers: [...new Set(farmerNames)].join(', '),
+      combined_qty_from_sources: totalQty,
+      created_by: session.username,
+      cleaning_operator: data.cleaning_operator,
+      cleaning_method: data.cleaning_method,
+      cleaning_qty_per_round: data.cleaning_qty_per_round,
+      cleaning_time_per_round: data.cleaning_time_per_round,
+      cleaning_round_count: data.cleaning_round_count,
+      cleaning_end_time: data.cleaning_end_time,
+      is_combined_lot: true,
+      timeline: [{ state: 'CLEANED', timestamp: now.getTime(), user: session.username, action: 'combined_cleaning', source_lots: lotIds }]
+    };
+    
+    const newRow = [
+      combinedLotId, 'CLEANED', agentId || session.username, farmerIds.join(','),
+      now, now, JSON.stringify(combinedData), JSON.stringify(combinedData.timeline), 0, "[]", true
+    ];
+    
+    sheet.appendRow(newRow);
+    
     return { 
       success: true, 
-      message: `อัปเดต ${updatedCount} Lot สำเร็จ`,
-      batch_id: cleaningBatchId,
-      updated_count: updatedCount
+      message: `รวม ${sourceLots.length} Lot เป็น "${combinedLotId}" สำเร็จ`,
+      combined_lot_id: combinedLotId,
+      merged_count: sourceLots.length
     };
     
   } catch (e) {

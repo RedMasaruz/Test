@@ -7393,7 +7393,8 @@
                 CLEANED: "ล้างทำความสะอาดแล้ว",
                 DRIED: "อบแห้งแล้ว",
                 GROUND: "บดผงแล้ว",
-                PACKED: "บรรจุแล้ว"
+                PACKED: "บรรจุแล้ว",
+                MERGED: "รวม Lot แล้ว"
             };
 
             const STATE_FLOW = [
@@ -7677,7 +7678,7 @@
                             submitBtn.innerText = 'ยืนยันรวมล้าง';
                         }
                         if (res.success) {
-                            showCustomAlert(`✅ อัปเดต ${lotIds.length} Lot เป็นสถานะ "ล้างแล้ว" สำเร็จ`, 'success');
+                            showCustomAlert(`✅ ${res.message}`, 'success');
                             closeDeliveryForm();
                             selectedSortedLots.clear();
                             updateCombineCleaningButton();

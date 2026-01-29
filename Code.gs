@@ -1035,6 +1035,7 @@ function getAllFarmersByLong(longName, sessionToken) {
     
     // Flexible header matching - check multiple possible column names
     let longIndex = headers.indexOf('ตัวแทนที่สังกัด');
+    if (longIndex === -1) longIndex = headers.indexOf('a-long-affiliation');
     if (longIndex === -1) longIndex = headers.indexOf('ล้งที่สังกัด');
     if (longIndex === -1) longIndex = headers.indexOf('ตัวแทน');
     if (longIndex === -1) longIndex = headers.indexOf('ล้ง');
@@ -1043,7 +1044,7 @@ function getAllFarmersByLong(longName, sessionToken) {
     
     // Try findHeaderIndexFlexible as last resort
     if (longIndex === -1) {
-      longIndex = findHeaderIndexFlexible(sheet, ['ตัวแทนที่สังกัด', 'ล้งที่สังกัด', 'ตัวแทน', 'ล้ง']);
+      longIndex = findHeaderIndexFlexible(sheet, ['ตัวแทนที่สังกัด', 'a-long-affiliation', 'ล้งที่สังกัด', 'ตัวแทน', 'ล้ง']);
     }
     
     if (longIndex === -1) {

@@ -1,0 +1,657 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+LayoutDashboard, ClipboardCheck, UserCheck, Sparkles, MapPin,
+Building2, Wrench, Leaf, Droplets, FileText, Scissors,
+Settings, PackageCheck, Truck, ChevronRight, Menu, X,
+AlertCircle, Info, CheckCircle2, Camera, MapPin as GpsIcon,
+User, Calendar, Save, Download, AlertTriangle, Users, HelpCircle,
+MessageSquarePlus, ChevronDown, ChevronUp, BarChart3, PieChart
+} from 'lucide-react';
+
+const App = () => {
+const [activeTab, setActiveTab] = useState('dashboard');
+const [isSidebarOpen, setSidebarOpen] = useState(false);
+const [showCriteria, setShowCriteria] = useState(false);
+const [isSaving, setIsSaving] = useState(false);
+
+// ข้อมูลเกษตรกร
+const [farmerInfo, setFarmerInfo] = useState({
+hasRepresentative: false,
+representativeName: '',
+firstName: '',
+lastName: '',
+location: '',
+date: new Date().toISOString().split('T')[0],
+gps: 'ยังไม่ได้ระบุ'
+});
+
+// ข้อมูลหมายเหตุ (Notes) และรูปภาพ
+const [notesData, setNotesData] = useState({});
+const [imagesData, setImagesData] = useState({});
+
+// State สำหรับทุกหมวดหมู่
+const [checkData, setCheckData] = useState({
+'quality-assurance': Array(8).fill(false),
+'personnel': Array(6).fill(false),
+'hygiene-dressing': Array(4).fill(false),
+'hygiene-behavior': Array(3).fill(false),
+'hygiene-health': Array(3).fill(false),
+'site-soil': Array(4).fill(false),
+'site-physical': Array(3).fill(false),
+'processing-location': Array(3).fill(false),
+'processing-zoning': Array(4).fill(false),
+'processing-utilities': Array(4).fill(false),
+'tools-design': Array(3).fill(false),
+'tools-maint': Array(3).fill(false),
+'tools-waste': Array(4).fill(false),
+'fertilizer-reg': Array(3).fill(false),
+'fertilizer-usage': Array(4).fill(false),
+'fertilizer-storage': Array(2).fill(false),
+'water-quality': Array(4).fill(false),
+'water-risk': Array(3).fill(false),
+'water-system': Array(2).fill(false),
+'docs-sop': Array(5).fill(false),
+'docs-records': Array(5).fill(false),
+'docs-trace': Array(5).fill(false),
+'harvest-standard': Array(3).fill(false),
+'harvest-pests': Array(5).fill(false),
+'harvest-ops': Array(4).fill(false),
+'harvest-logistics': Array(4).fill(false),
+'pre-processing-raw': Array(3).fill(false),
+'pre-processing-drying': Array(3).fill(false),
+'pre-processing-storage': Array(3).fill(false),
+'pre-processing-standards': Array(2).fill(false),
+'packaging-std': Array(4).fill(false),
+'packaging-finished': Array(3).fill(false),
+'packaging-label': Array(5).fill(false),
+'transport-env': Array(3).fill(false),
+'transport-qc': Array(3).fill(false),
+'transport-trace': Array(2).fill(false),
+});
+
+const menuItems = useMemo(() => [
+{ id: 'dashboard', label: 'Dashboard & Analytics', icon: LayoutDashboard },
+{ id: 'quality-assurance', label: '1. การประกันคุณภาพ', icon: ClipboardCheck, sections: ['quality-assurance'] },
+{ id: 'personnel', label: '2. บุคลากร', icon: UserCheck, sections: ['personnel'] },
+{ id: 'hygiene', label: '3. สุขลักษณะส่วนบุคคล', icon: Sparkles, sections: ['hygiene-dressing', 'hygiene-behavior',
+'hygiene-health'] },
+{ id: 'site', label: '4. มาตรฐานพื้นที่ปลูก', icon: MapPin, sections: ['site-soil', 'site-physical'] },
+{ id: 'processing', label: '5. สถานที่แปรรูปเบื้องต้นและบรรจุ', icon: Building2, sections: ['processing-location',
+'processing-zoning', 'processing-utilities'] },
+{ id: 'tools', label: '6. มาตรฐานอุปกรณ์', icon: Wrench, sections: ['tools-design', 'tools-maint', 'tools-waste'] },
+{ id: 'fertilizer', label: '7. การจัดการปุ๋ย', icon: Leaf, sections: ['fertilizer-reg', 'fertilizer-usage',
+'fertilizer-storage'] },
+{ id: 'water', label: '8. มาตรฐานการจัดการน้ำ', icon: Droplets, sections: ['water-quality', 'water-risk',
+'water-system'] },
+{ id: 'documents', label: '9. การจัดการเอกสาร', icon: FileText, sections: ['docs-sop', 'docs-records', 'docs-trace'] },
+{ id: 'harvest', label: '10. คุณภาพการเก็บเกี่ยว', icon: Scissors, sections: ['harvest-standard', 'harvest-pests',
+'harvest-ops', 'harvest-logistics'] },
+{ id: 'pre-processing', label: '11. กระบวนการแปรรูปเบื้องต้น', icon: Settings, sections: ['pre-processing-raw',
+'pre-processing-drying', 'pre-processing-storage', 'pre-processing-standards'] },
+{ id: 'packaging', label: '12. การบรรจุและการติดฉลาก', icon: PackageCheck, sections: ['packaging-std',
+'packaging-finished', 'packaging-label'] },
+{ id: 'transport', label: '13. การจัดเก็บและการขนย้าย', icon: Truck, sections: ['transport-env', 'transport-qc',
+'transport-trace'] },
+], []);
+
+const handleCheck = (section, index) => {
+setCheckData(prev => ({
+...prev,
+[section]: prev[section].map((item, i) => i === index ? !item : item)
+}));
+};
+
+const handleNoteChange = (section, index, value) => {
+setNotesData(prev => ({
+...prev,
+[`${section}-${index}`]: value
+}));
+};
+
+const handleSave = () => {
+setIsSaving(true);
+setTimeout(() => {
+setIsSaving(false);
+// ในอนาคตสามารถเชื่อมต่อ API หรือ Firestore ได้ที่นี่
+}, 1500);
+};
+
+const calculateProgress = (sections) => {
+if (!sections || sections.length === 0) return 0;
+let total = 0;
+let completed = 0;
+sections.forEach(s => {
+if (checkData[s]) {
+total += checkData[s].length;
+completed += checkData[s].filter(Boolean).length;
+}
+});
+return Math.round((completed / total) * 100) || 0;
+};
+
+const getOverallStatus = () => {
+const p = calculateProgress(Object.keys(checkData));
+if (p === 100) return { text: 'ผ่านเกณฑ์ดีเยี่ยม', color: 'text-emerald-500', bg: 'bg-emerald-500' };
+if (p >= 80) return { text: 'ผ่านเกณฑ์พื้นฐาน', color: 'text-blue-500', bg: 'bg-blue-500' };
+return { text: 'ต้องปรับปรุงแก้ไข', color: 'text-amber-500', bg: 'bg-amber-500' };
+};
+
+const Sidebar = () => (
+<div className={`fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 text-white transform ${isSidebarOpen ? 'translate-x-0'
+    : '-translate-x-full' } transition-transform duration-300 lg:translate-x-0 lg:static lg:inset-0 shadow-2xl`}>
+    <div className="flex items-center justify-between p-6 border-b border-slate-800 bg-slate-900">
+        <h1 className="text-xl font-bold flex items-center gap-2 text-emerald-400">
+            <Leaf size={24} /> GACP <span
+                className="text-[10px] bg-emerald-500/20 px-2 py-0.5 rounded text-emerald-300">v1.0</span>
+        </h1>
+        <button onClick={()=> setSidebarOpen(false)} className="lg:hidden p-1 hover:bg-slate-800 rounded">
+            <X size={24} />
+        </button>
+    </div>
+    <nav className="mt-2 h-[calc(100vh-100px)] overflow-y-auto custom-scrollbar">
+        {menuItems.map((item) => (
+        <button key={item.id} onClick={()=> { setActiveTab(item.id); setSidebarOpen(false); }}
+            className={`w-full flex items-center gap-3 px-6 py-3.5 text-sm transition-all hover:bg-slate-800 ${activeTab
+            === item.id ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/20' : 'text-slate-400'}`}
+            >
+            <item.icon size={18} />
+            <span className="text-left font-medium">{item.label}</span>
+        </button>
+        ))}
+    </nav>
+</div>
+);
+
+const FarmerCard = () => (
+<div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200 mb-6 transition-all">
+    <div className="flex flex-col gap-8">
+        <div className="flex flex-wrap items-center gap-4 border-b border-slate-100 pb-6">
+            <div className="flex items-center gap-3 mr-4">
+                <Users className="text-emerald-500" size={24} />
+                <span className="font-black text-slate-700 text-sm uppercase tracking-wider">สถานะการตรวจสอบ</span>
+            </div>
+            <div className="flex bg-slate-100 p-1.5 rounded-2xl">
+                <button onClick={()=> setFarmerInfo({...farmerInfo, hasRepresentative: false})}
+                    className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all ${!farmerInfo.hasRepresentative
+                    ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                    ไม่มีตัวแทน
+                </button>
+                <button onClick={()=> setFarmerInfo({...farmerInfo, hasRepresentative: true})}
+                    className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all ${farmerInfo.hasRepresentative
+                    ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                    มีตัวแทน
+                </button>
+            </div>
+            {farmerInfo.hasRepresentative && (
+            <div className="flex-1 min-w-[300px] animate-in slide-in-from-left duration-300">
+                <input placeholder="โปรดระบุชื่อตัวแทน..."
+                    className="w-full bg-emerald-50/50 border-2 border-emerald-100 rounded-2xl px-5 py-2.5 text-sm focus:border-emerald-500 focus:ring-0 outline-none font-medium placeholder:text-emerald-300"
+                    value={farmerInfo.representativeName} onChange={(e)=> setFarmerInfo({...farmerInfo,
+                representativeName: e.target.value})}
+                />
+            </div>
+            )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label
+                            className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">ชื่อเกษตรกร</label>
+                        <div
+                            className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 group focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-500/10 transition-all">
+                            <User className="text-slate-400 group-focus-within:text-emerald-500" size={18} />
+                            <input placeholder="ชื่อ..."
+                                className="w-full bg-transparent border-none p-0 focus:ring-0 outline-none font-bold text-slate-800"
+                                value={farmerInfo.firstName} onChange={(e)=> setFarmerInfo({...farmerInfo, firstName:
+                            e.target.value})}
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label
+                            className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">นามสกุล</label>
+                        <div
+                            className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 group focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-500/10 transition-all">
+                            <input placeholder="นามสกุล..."
+                                className="w-full bg-transparent border-none p-0 focus:ring-0 outline-none font-bold text-slate-800"
+                                value={farmerInfo.lastName} onChange={(e)=> setFarmerInfo({...farmerInfo, lastName:
+                            e.target.value})}
+                            />
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label
+                        className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">ที่ตั้งแปลง
+                        / จังหวัด</label>
+                    <div
+                        className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 group focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-500/10 transition-all">
+                        <MapPin className="text-slate-400 group-focus-within:text-emerald-500" size={20} />
+                        <input placeholder="ตำบล, อำเภอ, จังหวัด..."
+                            className="w-full bg-transparent border-none p-0 focus:ring-0 outline-none font-bold text-slate-800"
+                            value={farmerInfo.location} onChange={(e)=> setFarmerInfo({...farmerInfo, location:
+                        e.target.value})}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            <div className="space-y-6 md:border-l border-slate-100 md:pl-8">
+                <div>
+                    <label
+                        className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">วันที่เข้าตรวจสอบ</label>
+                    <div
+                        className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 group focus-within:border-emerald-500 transition-all">
+                        <Calendar className="text-slate-400 group-focus-within:text-emerald-500" size={20} />
+                        <input type="date" value={farmerInfo.date} onChange={(e)=> setFarmerInfo({...farmerInfo, date:
+                        e.target.value})}
+                        className="w-full bg-transparent border-none p-0 focus:ring-0 outline-none font-bold
+                        text-slate-800"
+                        />
+                    </div>
+                </div>
+                <div>
+                    <label
+                        className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">พิกัดแปลง
+                        (GPS)</label>
+                    <div
+                        className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3">
+                        <div className="flex items-center gap-3">
+                            <GpsIcon className="text-emerald-500" size={20} />
+                            <span className="font-bold text-slate-800">{farmerInfo.gps}</span>
+                        </div>
+                        <button onClick={()=> setFarmerInfo({...farmerInfo, gps: '13.7563, 100.5018'})}
+                            className="text-xs font-black bg-emerald-100 text-emerald-700 px-4 py-2 rounded-xl
+                            hover:bg-emerald-200 transition-colors"
+                            >
+                            อัปเดตตำแหน่ง
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+);
+
+const ChecklistItem = ({ section, index, label }) => {
+const [showNoteField, setShowNoteField] = useState(false);
+const noteKey = `${section}-${index}`;
+const currentNote = notesData[noteKey] || '';
+const currentImages = imagesData[noteKey] || 0;
+
+return (
+<div className="group border-b border-slate-50 last:border-0 transition-all duration-200 overflow-hidden">
+    <div className="flex items-start justify-between p-5 group-hover:bg-emerald-50/20">
+        <div className="flex items-start gap-4 flex-1">
+            <span
+                className="mt-1.5 flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-[10px] font-black text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-colors">
+                {index + 1}
+            </span>
+            <div className="flex-1 pr-4">
+                <span className="text-slate-700 block font-bold leading-relaxed">{label}</span>
+                <div className="flex gap-4 mt-3">
+                    <button onClick={()=> setImagesData(prev => ({...prev, [noteKey]: (prev[noteKey] || 0) + 1}))}
+                        className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider
+                        text-slate-400 hover:text-emerald-600 transition-colors"
+                        >
+                        <Camera size={14} /> {currentImages > 0 ? `รูปภาพ (${currentImages})` : 'เพิ่มรูปหลักฐาน'}
+                    </button>
+                    <button onClick={()=> setShowNoteField(!showNoteField)}
+                        className={`flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider
+                        transition-colors ${showNoteField || currentNote ? 'text-amber-600' : 'text-slate-400
+                        hover:text-amber-600'}`}
+                        >
+                        <MessageSquarePlus size={14} /> {currentNote ? 'แก้ไขหมายเหตุ' : 'เพิ่มหมายเหตุ'}
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div className="flex pt-1.5 pl-4">
+            <input type="checkbox" checked={checkData[section][index]} onChange={()=> handleCheck(section, index)}
+            className="w-8 h-8 rounded-xl border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer
+            shadow-sm transition-all"
+            />
+        </div>
+    </div>
+
+    {/* Note Input Field */}
+    {(showNoteField || currentNote) && (
+    <div className="px-5 pb-5 animate-in slide-in-from-top-2 duration-300">
+        <div className="ml-10 bg-amber-50/50 border border-amber-100 rounded-2xl p-3">
+            <div className="flex items-center justify-between mb-2">
+                <span
+                    className="text-[10px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-2">
+                    <FileText size={12} /> หมายเหตุ / ข้อเสนอแนะ
+                </span>
+                {currentNote && !showNoteField && (
+                <button onClick={()=> setShowNoteField(true)} className="text-[10px] text-amber-600 underline
+                    font-bold">แก้ไข</button>
+                )}
+            </div>
+            {showNoteField ? (
+            <textarea rows="2"
+                className="w-full bg-white border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-amber-200 outline-none text-slate-700 placeholder:text-slate-300"
+                placeholder="พิมพ์ข้อความที่นี่..." value={currentNote} onChange={(e)=> handleNoteChange(section, index, e.target.value)}
+                  onBlur={() => { if (!currentNote) setShowNoteField(false); }}
+                />
+              ) : (
+                <p className="text-sm text-slate-600 px-1 italic">"{currentNote}"</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const PageContainer = ({ title, subtitle, sections }) => {
+    const currentMenuItem = menuItems.find(m => m.id === activeTab);
+    const IconComponent = currentMenuItem ? currentMenuItem.icon : HelpCircle;
+
+    return (
+      <div className="max-w-5xl mx-auto space-y-6 pb-24 animate-in fade-in duration-300">
+        <div className="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
+          <div className="p-8 border-b border-slate-100 bg-white flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex gap-4 items-center">
+              <div className="p-4 bg-emerald-500 rounded-2xl text-white shadow-lg shadow-emerald-500/30">
+                  <IconComponent size={32} />
+              </div>
+              <div>
+                  <h2 className="text-2xl font-black text-slate-900 tracking-tight">{title}</h2>
+                  <p className="text-slate-500 text-sm mt-1 font-bold">{subtitle}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-6 bg-slate-50 p-5 rounded-3xl border border-slate-100">
+              <div className="text-right">
+                <div className="text-3xl font-black text-emerald-600">{calculateProgress(sections)}%</div>
+                <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest">ความคืบหน้า</div>
+              </div>
+              {(title?.includes("พื้นที่ปลูก") || title?.includes("น้ำ")) ? (
+                <button 
+                  onClick={() => setShowCriteria(!showCriteria)}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-2xl text-sm font-black shadow-md shadow-emerald-500/30 hover:bg-emerald-700 transition-all"
+                >
+                  <Info size={18} /> เกณฑ์มาตรฐาน
+                </button>
+              ) : null}
+            </div>
+          </div>
+          <div className="p-6 md:p-10 space-y-10 bg-slate-50/20">
+            {sections.map(section => (
+              <div key={section} className="bg-white border border-slate-200 rounded-[2rem] overflow-hidden shadow-sm">
+                <div className="bg-slate-50 px-8 py-4 border-b border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest">
+                        {section.replace('-', ' ')}
+                    </h3>
+                  </div>
+                  <div className="text-[10px] font-black text-slate-400">
+                    บันทึกแล้ว {Object.keys(notesData).filter(k => k.startsWith(section)).length} หมายเหตุ
+                  </div>
+                </div>
+                <div className="divide-y divide-slate-100">
+                    {renderSectionItems(section)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        {showCriteria && (
+            <div className="bg-slate-900 text-white rounded-[2rem] p-10 shadow-2xl border border-slate-700 animate-in zoom-in duration-300">
+              <div className="flex justify-between items-center mb-8">
+                  <h3 className="text-xl font-black flex items-center gap-4">
+                  <AlertCircle className="text-amber-400" size={28} /> ตารางค่ามาตรฐานความปลอดภัย
+                  </h3>
+                  <button onClick={() => setShowCriteria(false)} className="bg-slate-800 p-2.5 rounded-full hover:bg-slate-700 transition-colors"><X size={20} /></button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-6">
+                  {[
+                  { n: "ตะกั่ว (Pb)", v: "ไม่เกิน 10.0 มก./กก." },
+                  { n: "สารหนู (As)", v: "ไม่เกิน 5.0 มก./กก." },
+                  { n: "ปรอท (Hg)", v: "ไม่เกิน 0.5 มก./กก." },
+                  { n: "แคดเมียม (Cd)", v: "ไม่เกิน 0.3 มก./กก." },
+                  { n: "แมงกานีส (Mn)", v: "ไม่เกิน 200.0 มก./กก." },
+                  { n: "DDT / Endosulfan", v: "1.0 / 3.0 มก./กก." },
+                  ].map((item, idx) => (
+                  <div key={idx} className="flex justify-between items-center border-b border-slate-800 pb-4">
+                      <span className="text-slate-400 font-bold">{item.n}</span>
+                      <span className="font-mono text-emerald-400 font-black bg-emerald-400/10 px-3 py-1 rounded-lg text-sm">{item.v}</span>
+                  </div>
+                  ))}
+              </div>
+            </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderSectionItems = (section) => {
+    const items = {
+      'quality-assurance': ["แผนควบคุมการผลิตภาพรวม (CP/CCP)", "การเตรียมแปลงและเพาะพันธุ์", "การส่งเสริมการเจริญเติบโต", "การควบคุมศัตรูพืช", "การจัดการเพื่อความปลอดภัย", "การเก็บเกี่ยวและหลังเก็บเกี่ยว", "การขนย้ายวัตถุดิบ", "การอบรมพนักงาน"],
+      'personnel': ["ความรู้ปัจจัยการผลิตและความปลอดภัย", "ทักษะการปลูกและดูแลรักษา", "ทักษะการเก็บเกี่ยว", "ทักษะการแปรรูป", "การเก็บรักษาวัตถุดิบ", "การรักษาคุณภาพหลังเก็บเกี่ยว"],
+      'hygiene-dressing': ["ชุดปฏิบัติงานในแปลง สะอาด ปลอดภัย", "ชุดปฏิบัติงานแปรรูป (หมวก/หน้ากาก/ถุงมือ)", "งดสวมเครื่องประดับขณะแปรรูป", "อุปกรณ์ PPE สำหรับสารชีวภัณฑ์"],
+      'hygiene-behavior': ["การล้างมือถูกต้องและสม่ำเสมอ", "เขตปลอดบุหรี่และอาหารในจุดผลิต", "การควบคุมสุขอนามัยบุคคลภายนอก"],
+      'hygiene-health': ["ตรวจสุขภาพประจำปี", "นโยบายการลาป่วย (ท้องเสีย/แผลเปิด)", "การอบรมการใช้ชุดป้องกัน"],
+      'site-soil': ["ผลตรวจโลหะหนัก 5 ชนิด", "ผลตรวจสารเคมีกำจัดศัตรูพืช", "หลักฐานการวิเคราะห์ดินรายปี", "แผนบริหารความเสี่ยงภัยธรรมชาติ"],
+      'site-physical': ["แนวกันชน/รั้วรอบแปลง", "การจัดการขยะ/สิ่งปฏิกูลในฟาร์ม", "ระยะห่างจากแหล่งมลพิษ"],
+      'processing-location': ["สถานที่สะอาด ไร้กลิ่น/ควัน", "โครงสร้างแข็งแรง กันสัตว์/แมลง", "วัสดุผิวสัมผัสล้างทำความสะอาดง่าย"],
+      'processing-zoning': ["ผังการไหลแบบทางเดียว", "แยกโซน ล้าง/ผลิต/บรรจุ", "พื้นที่กักกันวัตถุดิบแยกชัดเจน", "จุดเปลี่ยนเครื่องแต่งกายพนักงาน"],
+      'processing-utilities': ["น้ำสะอาดและถังเก็บมิดชิด", "ระบบระบายอากาศ/กรองอากาศ", "แสงสว่างเพียงพอและมีฝาครอบไฟ", "อ่างล้างมือพร้อมน้ำยาฆ่าเชื้อ"],
+      'tools-design': ["อุปกรณ์สัมผัสพืชสะอาด", "วัสดุ Food Grade ไม่เป็นสนิม", "ออกแบบให้ถอดล้างทำความสะอาดง่าย"],
+      'tools-maint': ["เครื่องชั่งมีความเที่ยงตรง", "ใบสอบเทียบประจำปี (Calibration)", "บันทึกการซ่อมบำรุงรักษา"],
+      'tools-waste': ["ถังขยะปิดมิดชิดกันรั่ว", "ป้ายกำกับถังขยะชัดเจน", "ทางขนย้ายของเสียแยกจากผลผลิต", "กำจัดขยะทิ้งทุกวัน"],
+      'fertilizer-reg': ["ปุ๋ยมีเลขทะเบียน DOA ถูกต้อง", "ใบขึ้นทะเบียน (กรณีผลิตเอง)", "ผลตรวจโลหะหนักในปุ๋ยหมัก"],
+      'fertilizer-usage': ["ใช้ตามความต้องการพืช", "กันปุ๋ยปนเปื้อนเชื้อโรคสู่ใบ", "ห้ามใช้สิ่งขับถ่ายคน", "ปุ๋ยอินทรีย์ย่อยสลายสมบูรณ์แล้ว"],
+      'fertilizer-storage': ["แยกพื้นที่เก็บ/ผสมเป็นสัดส่วน", "ไม่ปนเปื้อนสู่แหล่งน้ำ"],
+      'water-quality': ["ผลตรวจโลหะหนักผ่านเกณฑ์", "ผลตรวจสารเคมีกำจัดศัตรูพืช", "น้ำล้างคุณภาพระดับน้ำดื่ม", "รายงานผลตรวจน้ำประจำปี"],
+      'water-risk': ["แผนสุ่มตรวจบ่อพักน้ำ", "ประเมินความเสี่ยงมลพิษข้างเคียง", "ไม่ใช้น้ำเสียโรงงาน/ชุมชน"],
+      'water-system': ["วิธีการให้น้ำเหมาะสม", "ระบบบำบัดน้ำทิ้งก่อนปล่อย"],
+      'docs-sop': ["SOP การปลูก/ธาตุอาหาร", "SOP ศัตรูพืช/ระบบน้ำ", "SOP หลังเก็บเกี่ยว/บด", "SOP บรรจุ/ขนส่ง/ของเสีย", "SOP ฝึกอบรม/บันทึก"],
+      'docs-records': ["ประวัติที่ดิน 3 ปี", "บันทึกกิจกรรมประจำวัน", "บันทึกปัจจัยการผลิต", "บันทึกสารชีวภัณฑ์", "บันทึกสภาพอากาศ"],
+      'docs-trace': ["หมายเลขรุ่นผลิต (Lot)", "เอกสารซื้อขายครบถ้วน", "บันทึกการประเมินย้อนหลัง", "บันทึกการทบทวนงาน", "เก็บเอกสารไว้อย่างน้อย 2 ปี"],
+      'harvest-standard': ["ป้องกันการปนสายพันธุ์", "ไม่กระทบชุมชน", "เกษตรเชิงอนุรักษ์"],
+      'harvest-pests': ["ระบบ IPM", "สารเคมีมีทะเบียน", "สารชีวภัณฑ์ปลอดภัย", "สอบเทียบเครื่องพ่น", "แยกที่เก็บสารเคมี"],
+      'harvest-ops': ["ระยะเก็บเหมาะสม", "เก็บตอนฟ้าแจ้ง", "คัดใบราทิ้ง", "กันวัชพืชปน"],
+      'harvest-logistics': ["ภาชนะสะอาดไม่วางพื้น", "ไม่วางซ้อนทับกันหนา", "พนักงานสะอาด", "ขนส่งทันทีกันฝุ่น"],
+      'pre-processing-raw': ["คุมอุณหภูมิวัตถุดิบ", "ล้างใบสะอาด", "คัดแยกก่อนเข้าผลิต"],
+      'pre-processing-drying': ["ทำแห้งทันที", "ระบบลดความชื้นดี", "ไม่แปรรูปปนพืชอื่น"],
+      'pre-processing-storage': ["คุมความชื้นที่เก็บ", "กันหนู/แมลงมิดชิด", "อุปกรณ์ไม่เป็นสนิม"],
+      'pre-processing-standards': ["มาตรฐานไทย/ต่างประเทศ", "แจ้งกรรมวิธีพิเศษ (ถ้ามี)"],
+      'packaging-std': ["บรรจุทันทีกันแสง", "วัสดุ Food Grade", "SOP การล้างภาชนะใช้ซ้ำ", "ที่เก็บภาชนะเปล่าสะอาด"],
+      'packaging-finished': ["วางบนพาเลทพลาสติก", "เว้นระยะจากผนัง", "แยกเก็บพืชอื่นชัดเจน"],
+      'packaging-label': ["ชื่อพืช/ส่วนที่ใช้", "ชื่อผู้ผลิต/แหล่งต้นกำเนิด", "เลขรุ่น/วันเก็บเกี่ยว/วันผลิต", "ปริมาณบรรจุชัดเจน", "หมึกพิมพ์คงทน"],
+      'transport-env': ["รถขนส่งกันแสง/ความชื้น", "คลังสินค้าคุมปัจจัยแวดล้อม", "กันปนเปื้อนระหว่างทาง"],
+      'transport-qc': ["ผลแล็บรายรุ่น (เชื้อ/เคมี)", "ตรวจความชื้น (Moisture)", "แผนการสุ่มตรวจชัดเจน"],
+      'transport-trace': ["เก็บตัวอย่างอ้างอิง 6 เดือน", "สืบค้นข้อมูลย้อนกลับได้ทันที"]
+    };
+
+    return items[section]?.map((label, i) => (
+      <ChecklistItem key={i} section={section} index={i} label={label} />
+    ));
+  };
+
+  return (
+    <div className="flex h-screen bg-slate-100 font-sans overflow-hidden">
+      <Sidebar />
+      <main className="flex-1 overflow-y-auto p-4 lg:p-12 custom-scrollbar">
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-6">
+          <div>
+            <h1 className="text-4xl font-black text-slate-900 tracking-tighter">Thailand Kratom GACP System</h1>
+            <p className="text-slate-500 font-bold text-xs uppercase tracking-[0.2em] mt-2 flex items-center gap-2">
+               <span className="w-8 h-[2px] bg-emerald-500"></span> 
+               ระบบตรวจรับรองมาตรฐานพืชกระท่อม
+            </p>
+          </div>
+          <div className="flex gap-4">
+             <button className="flex items-center gap-2.5 bg-white text-slate-700 px-8 py-4 rounded-3xl font-black text-sm border border-slate-200 shadow-sm hover:bg-slate-50 transition-all active:scale-95">
+                <Download size={20} /> รายงาน PDF
+             </button>
+             <button 
+                onClick={handleSave}
+                disabled={isSaving}
+                className={`flex items-center gap-2.5 px-8 py-4 rounded-3xl font-black text-sm shadow-xl transition-all active:scale-95 ${isSaving ? 'bg-slate-400 cursor-not-allowed' : 'bg-emerald-600 text-white shadow-emerald-600/30 hover:bg-emerald-700'}`}
+             >
+                {isSaving ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <Save size={20} />}
+                {isSaving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
+             </button>
+          </div>
+        </div>
+
+        {activeTab === 'dashboard' && (
+          <div className="max-w-6xl mx-auto space-y-10 animate-in fade-in duration-700 pb-20">
+            <FarmerCard />
+            
+            {/* Analytics Header */}
+            <div className="flex items-center gap-3 mb-2">
+                <BarChart3 className="text-slate-400" size={24} />
+                <h2 className="text-lg font-black text-slate-700 uppercase tracking-widest">การวิเคราะห์ข้อมูลเชิงลึก</h2>
+            </div>
+
+            {/* Status Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                    <div className="relative z-10">
+                        <div className="flex justify-between items-start mb-8">
+                            <span className="text-slate-500 font-black text-[11px] uppercase tracking-widest">คะแนนการประเมินรวม</span>
+                            <div className={`p-3 rounded-2xl bg-slate-50 ${getOverallStatus().color} shadow-inner`}>
+                                <AlertTriangle size={28} />
+                            </div>
+                        </div>
+                        <div className="flex flex-col gap-1 mb-6">
+                            <span className="text-slate-400 font-black text-[10px] uppercase tracking-[0.2em]">เกษตรกรผู้รับการตรวจ:</span>
+                            <h3 className="text-2xl font-black text-slate-800">
+                              {(farmerInfo.firstName || farmerInfo.lastName) 
+                                ? `${farmerInfo.firstName} ${farmerInfo.lastName}`.trim() 
+                                : "ยังไม่ได้ระบุชื่อ"}
+                            </h3>
+                        </div>
+                        <div className="flex items-end gap-3">
+                            <span className="text-8xl font-black text-slate-900 leading-none">{calculateProgress(Object.keys(checkData))}</span>
+                            <span className="text-4xl font-black text-slate-200 mb-2">%</span>
+                        </div>
+                        <p className={`mt-6 text-2xl font-black ${getOverallStatus().color} flex items-center gap-3`}>
+                            {getOverallStatus().text}
+                            {calculateProgress(Object.keys(checkData)) >= 80 && <CheckCircle2 size={24} />}
+                        </p>
+                    </div>
+
+                    {/* Mini Charts/Bars for Sections */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-10 relative z-10">
+                        {[
+                            { label: 'บุคลากร', p: calculateProgress(['personnel']) },
+                            { label: 'พื้นที่ปลูก', p: calculateProgress(['site-soil', 'site-physical']) },
+                            { label: 'แปรรูป', p: calculateProgress(['processing-location', 'processing-zoning', 'processing-utilities']) },
+                            { label: 'เอกสาร', p: calculateProgress(['docs-sop', 'docs-records', 'docs-trace']) }
+                        ].map((stat, i) => (
+                            <div key={i} className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="text-[10px] font-bold text-slate-400">{stat.label}</span>
+                                    <span className="text-[10px] font-black text-slate-700">{stat.p}%</span>
+                                </div>
+                                <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                    <div className="bg-emerald-500 h-full" style={{width: `${stat.p}%`}}></div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="absolute -bottom-10 -right-10 opacity-[0.03] pointer-events-none">
+                        <Leaf size={300} />
+                    </div>
+                </div>
+                
+                <div className="space-y-8">
+                    <div className="bg-emerald-600 p-10 rounded-[2.5rem] text-white shadow-2xl shadow-emerald-200 relative overflow-hidden group">
+                        <span className="text-emerald-200 font-black text-[11px] uppercase tracking-widest relative z-10">หมวดหมู่ที่ผ่านเกณฑ์</span>
+                        <p className="text-7xl font-black mt-6 relative z-10">
+                            {menuItems.slice(1).filter(m => calculateProgress(m.sections) === 100).length}
+                        </p>
+                        <p className="text-sm font-bold text-emerald-100 mt-4 relative z-10">จากทั้งหมด {menuItems.length - 1} หมวดใหญ่</p>
+                        <Users className="absolute -right-6 -bottom-6 text-white/10 group-hover:scale-110 transition-transform" size={120} />
+                    </div>
+
+                    <div className="bg-slate-900 p-10 rounded-[2.5rem] text-white shadow-2xl shadow-slate-300 relative overflow-hidden group">
+                        <span className="text-slate-500 font-black text-[11px] uppercase tracking-widest relative z-10">จุดที่ต้องแก้ไขสะสม</span>
+                        <p className="text-7xl font-black mt-6 text-amber-500 relative z-10">
+                            {Object.values(checkData).flat().filter(v => v === false).length}
+                        </p>
+                        <p className="text-sm font-bold text-slate-400 mt-4 relative z-10">รายการที่ยังไม่สมบูรณ์</p>
+                        <AlertCircle className="absolute -right-6 -bottom-6 text-white/5 group-hover:rotate-12 transition-transform" size={120} />
+                    </div>
+                </div>
+            </div>
+
+            {/* Quick Access Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {menuItems.slice(1).map((item) => {
+                const prog = calculateProgress(item.sections);
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id)}
+                    className="bg-white p-6 rounded-[2rem] border border-slate-200 hover:border-emerald-500 hover:shadow-2xl hover:-translate-y-2 transition-all text-left flex flex-col group relative overflow-hidden"
+                  >
+                    <div className="flex justify-between items-start mb-6">
+                      <div className={`p-4 rounded-2xl transition-all duration-300 ${prog === 100 ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' : 'bg-slate-100 text-slate-500 group-hover:bg-emerald-50'}`}>
+                        <item.icon size={24} />
+                      </div>
+                      {prog === 100 && (
+                          <div className="bg-emerald-50 p-2 rounded-full">
+                              <CheckCircle2 size={16} className="text-emerald-500" />
+                          </div>
+                      )}
+                    </div>
+                    <h4 className="font-black text-slate-800 text-sm group-hover:text-emerald-600 transition-colors line-clamp-2 mb-4 h-10 leading-snug">{item.label}</h4>
+                    <div className="mt-auto">
+                      <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">ความสมบูรณ์</span>
+                          <span className={`text-[10px] font-black ${prog === 100 ? 'text-emerald-600' : 'text-slate-600'}`}>{prog}%</span>
+                      </div>
+                      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                          <div className={`h-full transition-all duration-500 ${prog === 100 ? 'bg-emerald-500' : 'bg-slate-400 group-hover:bg-emerald-400'}`} style={{width: `${prog}%`}}></div>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {activeTab !== 'dashboard' && (
+            <PageContainer 
+                title={menuItems.find(m => m.id === activeTab)?.label}
+                subtitle={`การตรวจสอบความถูกต้องตามหลักเกณฑ์ GAP ในหมวด${menuItems.find(m => m.id === activeTab)?.label}`}
+                sections={menuItems.find(m => m.id === activeTab)?.sections || []}
+            />
+        )}
+      </main>
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        @keyframes slide-in {
+          from { transform: translateY(-8px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        .animate-in { animation: slide-in 0.3s ease-out forwards; }
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+      `}} />
+    </div>
+  );
+};
+
+export default App;

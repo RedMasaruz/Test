@@ -84,7 +84,8 @@ const ALLOWED_FUNCTIONS = [
   'getLotData',
   'getAdminDashboardData',
   'getAgentLots',
-  'getFarmersWithSheetBRecords'
+  'getFarmersWithSheetBRecords',
+  'updateMultipleLotState'
 ];
 
 // Survey-specific resources (Slides template, destination sheet & folder for PDFs)
@@ -2319,6 +2320,101 @@ function updateLotState(lotId, newState, data, sessionToken) {
     sheet.getRange(rowIndex, idxRiskFlags + 1).setValue(JSON.stringify(riskFlags));
     
     return { success: true, state: newState, lot_id: lotId };
+    
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+/**
+ * Update multiple lots to the same state (for combined cleaning)
+ * @param {Object} data - Contains lot_ids array and cleaning data
+ * @param {string} sessionToken - The session token
+ */
+function updateMultipleLotState(data, sessionToken) {
+  try {
+    const session = validateSessionToken(sessionToken);
+    if (!session) throw new Error('กรุณาล็อกอินใหม่');
+    
+    const lotIds = data.lot_ids;
+    if (!lotIds || !Array.isArray(lotIds) || lotIds.length === 0) {
+      throw new Error('ไม่พบรายการ Lot ที่ต้องการอัปเดต');
+    }
+    
+    const sheet = getLotsSheet();
+    const dataRange = sheet.getDataRange();
+    const values = dataRange.getValues();
+    const headers = values[0];
+    
+    const idxId = headers.indexOf('lot_id');
+    const idxState = headers.indexOf('state');
+    const idxData = headers.indexOf('data_json');
+    const idxHistory = headers.indexOf('history_json');
+    const idxUpdated = headers.indexOf('updated_at');
+    
+    const now = new Date();
+    const newState = 'CLEANED';
+    const cleaningBatchId = `BATCH-${now.getTime()}`;
+    
+    let updatedCount = 0;
+    
+    for (let i = 1; i < values.length; i++) {
+      const lotId = String(values[i][idxId]);
+      
+      if (lotIds.includes(lotId)) {
+        const rowIndex = i + 1;
+        
+        // Get current data
+        let currentData = {};
+        try { currentData = JSON.parse(values[i][idxData] || '{}'); } catch(e) {}
+        
+        // Get current history
+        let history = [];
+        try { history = JSON.parse(values[i][idxHistory] || '[]'); } catch(e) {}
+        
+        // Merge cleaning data
+        const updatedData = {
+          ...currentData,
+          cleaning_batch_id: cleaningBatchId,
+          cleaning_operator: data.cleaning_operator,
+          cleaning_method: data.cleaning_method,
+          cleaning_qty_per_round: data.cleaning_qty_per_round,
+          cleaning_time_per_round: data.cleaning_time_per_round,
+          cleaning_round_count: data.cleaning_round_count,
+          cleaning_end_time: data.cleaning_end_time
+        };
+        
+        // Add to history
+        history.push({
+          state: newState,
+          timestamp: now.getTime(),
+          user: session.username,
+          action: 'combined_cleaning',
+          batch_id: cleaningBatchId,
+          batch_lots: lotIds,
+          details: data
+        });
+        
+        // Update row
+        sheet.getRange(rowIndex, idxState + 1).setValue(newState);
+        sheet.getRange(rowIndex, idxData + 1).setValue(JSON.stringify(updatedData));
+        sheet.getRange(rowIndex, idxHistory + 1).setValue(JSON.stringify(history));
+        sheet.getRange(rowIndex, idxUpdated + 1).setValue(now);
+        
+        updatedCount++;
+      }
+    }
+    
+    if (updatedCount === 0) {
+      throw new Error('ไม่พบ Lot ที่ตรงกับรายการที่ระบุ');
+    }
+    
+    return { 
+      success: true, 
+      message: `อัปเดต ${updatedCount} Lot สำเร็จ`,
+      batch_id: cleaningBatchId,
+      updated_count: updatedCount
+    };
     
   } catch (e) {
     return { success: false, message: e.message };

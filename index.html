@@ -1190,7 +1190,7 @@
         <!-- SUBMENU VIEW (จัดการข้อมูล) -->
         <div id="submenu-view" class="space-y-6 hidden">
             <header class="mb-10 text-center">
-                <div class="flex justify-between items-center mb-4">
+                <div class="flex justify-end items-center mb-4">
                     <button onclick="logout()"
                         class="bg-red-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-600 flex items-center">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24"
@@ -1769,6 +1769,16 @@
                             </svg>
                             เก็บเกี่ยว (Harvest)
                         </button>
+                        <button id="combine-cleaning-btn" onclick="showCombinedCleaningModal()"
+                            class="hidden bg-cyan-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-cyan-700 shadow-md flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
+                                fill="currentColor">
+                                <path fill-rule="evenodd"
+                                    d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                            <span>รวมล้าง (0)</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -2198,7 +2208,8 @@
                     'userLogin', 'writeSheetA', 'writeSheetB', 'submitForm',
                     'searchFarmerData', 'getAllFarmersByLong', 'searchSheetBData',
                     'createNewSheetForLong', 'getAllFarmers', 'getAllUsage', 'getAllMerged',
-                    'getAgentLots', 'createLot', 'updateLotState', 'getFarmersWithSheetBRecords'
+                    'getAgentLots', 'createLot', 'updateLotState', 'getFarmersWithSheetBRecords',
+                    'updateMultipleLotState'
                 ];
 
                 backendFunctions.forEach(funcName => {
@@ -7396,6 +7407,8 @@
             ];
 
             let currentActiveLot = null;
+            // Track selected SORTED lots for combined cleaning
+            let selectedSortedLots = new Set();
 
             document.addEventListener('DOMContentLoaded', () => {
                 // Observer to auto-load lots when view is shown
@@ -7437,6 +7450,10 @@
 
             function renderActiveLots(lots) {
                 const container = document.getElementById('delivery-active-lots-container');
+                // Clear selected lots when reloading
+                selectedSortedLots.clear();
+                updateCombineCleaningButton();
+
                 if (!lots || lots.length === 0) {
                     container.innerHTML = `
                     <div class="text-center py-10 bg-gray-50 rounded-lg border border-gray-200">
@@ -7464,6 +7481,8 @@
                     let stateColor = "bg-gray-100 text-gray-800";
                     if (lot.state === 'PENDING') stateColor = "bg-yellow-100 text-yellow-800";
                     else if (lot.state === 'HARVESTED') stateColor = "bg-blue-100 text-blue-800";
+                    else if (lot.state === 'SORTED') stateColor = "bg-cyan-100 text-cyan-800";
+                    else if (lot.state === 'CLEANED') stateColor = "bg-teal-100 text-teal-800";
 
                     // Risk display
                     let riskHtml = '';
@@ -7471,33 +7490,199 @@
                         riskHtml = `<span class="ml-2 px-2 py-0.5 rounded text-xs bg-red-100 text-red-800 font-bold">⚠️ Risk: ${lot.risk_score}</span>`;
                     }
 
-                    html += `
-                    <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer" onclick="openLotAction('${lot.lot_id}', '${lot.state}')">
-                        <div class="flex justify-between items-start mb-2">
-                            <div>
-                                <div class="font-bold text-lg text-gray-800 flex items-center">
-                                    ${lot.lot_id}
-                                    ${riskHtml}
-                                </div>
-                                <div class="text-sm text-gray-500">เกษตรกร: ${lot.farmer_name || lot.farmer_id || '-'}</div>
+                    // Checkbox for SORTED lots
+                    let checkboxHtml = '';
+                    if (lot.state === 'SORTED') {
+                        checkboxHtml = `
+                            <div class="mr-3 flex items-center" onclick="event.stopPropagation()">
+                                <input type="checkbox" 
+                                    id="chk-${lot.lot_id}" 
+                                    class="sorted-lot-checkbox w-5 h-5 accent-cyan-600 cursor-pointer"
+                                    data-lot-id="${lot.lot_id}"
+                                    data-farmer-name="${lot.farmer_name || lot.farmer_id || '-'}"
+                                    onchange="toggleSortedLotSelection('${lot.lot_id}', '${lot.farmer_name || lot.farmer_id || '-'}', this.checked)">
                             </div>
-                            <span class="px-3 py-1 rounded-full text-xs font-semibold ${stateColor}">
-                                ${stateDisplay}
-                            </span>
-                        </div>
-                        <div class="flex justify-between items-end mt-4">
-                            <div class="text-xs text-gray-400">อัปเดตล่าสุด: ${dateDisplay}</div>
-                            <button class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1">
-                                ดำเนินการต่อ 
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                                </svg>
-                            </button>
+                        `;
+                    }
+
+                    html += `
+                    <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow ${lot.state === 'SORTED' ? 'border-l-4 border-l-cyan-500' : ''}">
+                        <div class="flex items-start">
+                            ${checkboxHtml}
+                            <div class="flex-grow cursor-pointer" onclick="openLotAction('${lot.lot_id}', '${lot.state}')">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div>
+                                        <div class="font-bold text-lg text-gray-800 flex items-center">
+                                            ${lot.lot_id}
+                                            ${riskHtml}
+                                        </div>
+                                        <div class="text-sm text-gray-500">เกษตรกร: ${lot.farmer_name || lot.farmer_id || '-'}</div>
+                                    </div>
+                                    <span class="px-3 py-1 rounded-full text-xs font-semibold ${stateColor}">
+                                        ${stateDisplay}
+                                    </span>
+                                </div>
+                                <div class="flex justify-between items-end mt-4">
+                                    <div class="text-xs text-gray-400">อัปเดตล่าสุด: ${dateDisplay}</div>
+                                    <button class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1">
+                                        ดำเนินการต่อ 
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 `;
                 });
                 container.innerHTML = html;
+            }
+
+            // Toggle lot selection for combined cleaning
+            function toggleSortedLotSelection(lotId, farmerName, isChecked) {
+                if (isChecked) {
+                    selectedSortedLots.add({ lotId, farmerName });
+                } else {
+                    selectedSortedLots.forEach(item => {
+                        if (item.lotId === lotId) selectedSortedLots.delete(item);
+                    });
+                }
+                updateCombineCleaningButton();
+            }
+
+            // Update the combine cleaning button visibility
+            function updateCombineCleaningButton() {
+                const btn = document.getElementById('combine-cleaning-btn');
+                if (btn) {
+                    if (selectedSortedLots.size > 0) {
+                        btn.classList.remove('hidden');
+                        btn.querySelector('span').textContent = `รวมล้าง (${selectedSortedLots.size})`;
+                    } else {
+                        btn.classList.add('hidden');
+                    }
+                }
+            }
+
+            // Show combined cleaning modal for selected SORTED lots
+            function showCombinedCleaningModal() {
+                if (selectedSortedLots.size === 0) {
+                    showCustomAlert('กรุณาเลือก Lot ที่ต้องการรวมล้างก่อน', 'warning');
+                    return;
+                }
+
+                const overlay = document.getElementById('delivery-form-overlay');
+                const content = document.getElementById('delivery-form-content');
+                const title = document.getElementById('delivery-form-title');
+                const btn = document.getElementById('delivery-form-submit-btn');
+
+                // Get selected lot info
+                const selectedLotsArray = Array.from(selectedSortedLots);
+                const lotIds = selectedLotsArray.map(l => l.lotId);
+                const farmerNames = [...new Set(selectedLotsArray.map(l => l.farmerName))].join(', ');
+
+                title.textContent = `รวมล้าง ${selectedSortedLots.size} Lot`;
+                overlay.classList.remove('hidden');
+
+                content.innerHTML = `
+                <form class="space-y-4" id="combined-cleaning-form">
+                    <input type="hidden" name="lot_ids" value="${lotIds.join(',')}">
+                    <input type="hidden" name="process_step" value="cleaning">
+                    
+                    <div class="p-4 bg-cyan-50 rounded-lg border border-cyan-200 mb-4">
+                        <h4 class="font-bold text-cyan-800 text-sm mb-2">Lot ที่เลือกรวมล้าง:</h4>
+                        <div class="flex flex-wrap gap-2">
+                            ${lotIds.map(id => `<span class="px-2 py-1 bg-cyan-100 text-cyan-800 rounded text-xs font-medium">${id}</span>`).join('')}
+                        </div>
+                        <p class="text-xs text-cyan-600 mt-2">เกษตรกร: ${farmerNames}</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">ผู้ควบคุม</label>
+                        <input type="text" name="cleaning_operator" required class="w-full border rounded p-2" placeholder="ระบุชื่อ">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">วิธีทำความสะอาด</label>
+                         <select name="cleaning_method" class="w-full border rounded p-2 bg-white">
+                                <option value="soaking">แช่น้ำ</option>
+                                <option value="flow">ล้างน้ำไหลผ่าน</option>
+                                <option value="other">อื่น ๆ</option>
+                        </select>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                             <label class="block text-sm font-medium mb-1">ปริมาณต่อรอบ (กก.)</label>
+                             <input type="number" name="cleaning_qty_per_round" required min="0" step="0.1" class="w-full border rounded p-2">
+                        </div>
+                        <div>
+                             <label class="block text-sm font-medium mb-1">เวลาที่ใช้ต่อรอบ (นาที)</label>
+                             <input type="number" name="cleaning_time_per_round" required min="0" class="w-full border rounded p-2">
+                        </div>
+                    </div>
+
+                    <div>
+                         <label class="block text-sm font-medium mb-1">จำนวนรอบล้าง (ครั้ง)</label>
+                         <input type="number" name="cleaning_round_count" value="1" required min="1" class="w-full border rounded p-2">
+                    </div>
+                    
+                     <div>
+                        <label class="block text-sm font-medium mb-1">เวลาจบงาน</label>
+                        <input type="time" name="cleaning_end_time" required class="w-full border rounded p-2">
+                    </div>
+                    
+                    <div class="p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+                        <span class="font-bold">⚠️ หมายเหตุ:</span> ทุก Lot ที่เลือกจะถูกอัปเดตเป็นสถานะ "ล้างแล้ว" พร้อมกัน
+                    </div>
+                </form>
+                `;
+
+                btn.innerText = "ยืนยันรวมล้าง";
+                btn.onclick = function () { submitCombinedCleaning(); };
+            }
+
+            // Submit combined cleaning for multiple lots
+            function submitCombinedCleaning() {
+                const form = document.getElementById('combined-cleaning-form');
+                if (!form || !form.reportValidity()) return;
+
+                const formData = new FormData(form);
+                const lotIds = formData.get('lot_ids').split(',');
+
+                const data = {
+                    lot_ids: lotIds,
+                    process_step: 'cleaning',
+                    cleaning_operator: formData.get('cleaning_operator'),
+                    cleaning_method: formData.get('cleaning_method'),
+                    cleaning_qty_per_round: formData.get('cleaning_qty_per_round'),
+                    cleaning_time_per_round: formData.get('cleaning_time_per_round'),
+                    cleaning_round_count: formData.get('cleaning_round_count'),
+                    cleaning_end_time: formData.get('cleaning_end_time')
+                };
+
+                const token = sessionStorage.getItem('sessionToken');
+
+                showLoading('กำลังบันทึกการล้าง...');
+
+                google.script.run
+                    .withSuccessHandler(res => {
+                        hideLoading();
+                        if (res.success) {
+                            showCustomAlert(`✅ อัปเดต ${lotIds.length} Lot เป็นสถานะ "ล้างแล้ว" สำเร็จ`, 'success');
+                            closeDeliveryForm();
+                            selectedSortedLots.clear();
+                            updateCombineCleaningButton();
+                            loadActiveLots();
+                        } else {
+                            showCustomAlert(`❌ ${res.message}`, 'danger');
+                        }
+                    })
+                    .withFailureHandler(err => {
+                        hideLoading();
+                        showCustomAlert(`❌ เกิดข้อผิดพลาด: ${err.message}`, 'danger');
+                    })
+                    .updateMultipleLotState(data, token);
             }
 
             // =============================================

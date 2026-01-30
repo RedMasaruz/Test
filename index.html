@@ -119,19 +119,23 @@
         </div>
     </div>
 
-    <!-- Back Button -->
-    <button id="back-button" onclick="goBack()"
-        class="fixed top-4 left-4 px-4 py-2 rounded-full bg-white shadow-lg z-10 hidden" title="กลับหน้าหลัก">
-        <div class="flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-400 mr-1" fill="none" viewBox="0 0 24 24"
-                stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            <span class="text-sm text-stone-600">กลับหน้าหลัก</span>
-        </div>
-    </button>
+    <!-- Back Button - moved inside container below -->
+
 
     <div class="form-container mx-auto">
+        <!-- Back Button -->
+        <button id="back-button" onclick="goBack()"
+            class="mb-4 px-4 py-2 rounded-full bg-white shadow-lg hidden hover:shadow-xl transition-shadow"
+            title="กลับหน้าหลัก">
+            <div class="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-400 mr-1" fill="none"
+                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                <span class="text-sm text-stone-600">กลับหน้าหลัก</span>
+            </div>
+        </button>
+
         <div id="api-warning" class="hidden"></div>
 
         <div id="api-status" class="hidden mt-4 p-3 rounded-lg text-sm"></div>
@@ -5689,66 +5693,57 @@
                 const alertId = 'custom-alert-modal';
                 let alertModal = document.getElementById(alertId);
 
+                // Create modal if doesn't exist
                 if (!alertModal) {
                     alertModal = document.createElement('div');
                     alertModal.id = alertId;
-                    alertModal.className = 'modal fade';
-                    alertModal.tabIndex = '-1';
-                    alertModal.innerHTML = `
-                    <div class="modal-dialog modal-dialog-centered">
-                        <div class="modal-content" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
-                            <div class="modal-header" style="border-bottom: none;">
-                                <h5 class="modal-title" id="alertModalTitle" style="font-weight: 700;">Notification</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    document.body.appendChild(alertModal);
+                }
+
+                // Determine colors based on type
+                let bgColor = 'bg-blue-600';
+                let titleText = 'ข้อความแจ้งเตือน';
+                let iconSvg = `<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+
+                if (type === 'success') {
+                    bgColor = 'bg-green-600';
+                    titleText = '✅ สำเร็จ';
+                    iconSvg = `<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+                } else if (type === 'danger') {
+                    bgColor = 'bg-red-600';
+                    titleText = '❌ ข้อผิดพลาด';
+                    iconSvg = `<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+                } else if (type === 'warning') {
+                    bgColor = 'bg-yellow-500';
+                    titleText = '⚠️ คำเตือน';
+                    iconSvg = `<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>`;
+                }
+
+                alertModal.innerHTML = `
+                    <div class="fixed inset-0 z-[9999] flex items-center justify-center p-4" id="alert-backdrop">
+                        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="document.getElementById('custom-alert-modal').innerHTML=''"></div>
+                        <div class="relative bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all animate-fade-in">
+                            <div class="${bgColor} px-6 py-4 flex items-center gap-3 text-white">
+                                ${iconSvg}
+                                <h3 class="font-bold text-lg">${titleText}</h3>
+                                <button onclick="document.getElementById('custom-alert-modal').innerHTML=''" class="ml-auto text-white/80 hover:text-white">
+                                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
                             </div>
-                            <div class="modal-body" id="alertModalBody" style="font-size: 1rem;">
-                                <!-- Message will be placed here -->
+                            <div class="px-6 py-5 text-gray-700">
+                                <p class="text-base">${message}</p>
                             </div>
-                            <div class="modal-footer" style="border-top: none;">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="border-radius: 8px;">ปิด</button>
+                            <div class="px-6 pb-5 flex justify-end">
+                                <button onclick="document.getElementById('custom-alert-modal').innerHTML=''" 
+                                    class="px-5 py-2.5 ${bgColor} text-white font-medium rounded-lg hover:opacity-90 transition-opacity">
+                                    ปิด
+                                </button>
                             </div>
                         </div>
                     </div>
                 `;
-                    document.body.appendChild(alertModal);
-                }
-
-                const modalTitle = document.getElementById('alertModalTitle');
-                const modalBody = document.getElementById('alertModalBody');
-                const modalHeader = alertModal.querySelector('.modal-header');
-
-                let titleText = 'ข้อความแจ้งเตือน';
-                let headerColor = '#388E3C';
-
-                if (type === 'success') {
-                    titleText = '✅ สำเร็จ';
-                    headerColor = '#4CAF50';
-                } else if (type === 'danger') {
-                    titleText = '❌ ข้อผิดพลาด';
-                    headerColor = '#D32F2F';
-                }
-
-                modalTitle.textContent = titleText;
-                // Use innerHTML to allow richer messages
-                modalBody.innerHTML = message;
-
-                // Apply header color
-                modalHeader.style.backgroundColor = headerColor;
-                modalTitle.style.color = 'white';
-                alertModal.querySelector('.btn-close').style.filter = 'invert(1)'; // Make close button visible on dark background
-
-                // Show the modal via Bootstrap if available, else fallback to alert
-                try {
-                    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-                        const modal = new bootstrap.Modal(alertModal);
-                        modal.show();
-                    } else {
-                        // fallback simple modal-like behavior
-                        alert(message.replace(/<br\s*\/?>/g, '\n').replace(/<\/?[^>]+(>|$)/g, ""));
-                    }
-                } catch (e) {
-                    alert(message.replace(/<br\s*\/?>/g, '\n').replace(/<\/?[^>]+(>|$)/g, ""));
-                }
             }
 
             window.showSection = function (targetId, btn) {

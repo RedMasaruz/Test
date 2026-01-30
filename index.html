@@ -119,19 +119,20 @@
         </div>
     </div>
 
-    <!-- Back Button -->
-    <button id="back-button" onclick="goBack()"
-        class="fixed top-4 left-4 px-4 py-2 rounded-full bg-white shadow-lg z-10 hidden" title="กลับหน้าหลัก">
-        <div class="flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-400 mr-1" fill="none" viewBox="0 0 24 24"
-                stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            <span class="text-sm text-stone-600">กลับหน้าหลัก</span>
-        </div>
-    </button>
-
     <div class="form-container mx-auto">
+        <!-- Back Button -->
+        <button id="back-button" onclick="goBack()"
+            class="mb-4 px-4 py-2 rounded-full bg-white shadow-lg hidden border border-gray-200 hover:bg-gray-50 transition-colors"
+            title="กลับหน้าหลัก">
+            <div class="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-400 mr-1" fill="none"
+                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                <span class="text-sm text-stone-600">กลับหน้าหลัก</span>
+            </div>
+        </button>
+
         <div id="api-warning" class="hidden"></div>
 
         <div id="api-status" class="hidden mt-4 p-3 rounded-lg text-sm"></div>
@@ -3756,20 +3757,30 @@
 
             // Helper function to show admin view after successful login
             function showAdminView() {
+                console.log('🔧 showAdminView() called');
+
                 const warning = document.getElementById('admin-access-warning');
                 const controls = document.getElementById('admin-controls');
                 const currentUserEl = document.getElementById('admin-current-user');
+                const adminView = document.getElementById('admin-view');
+
+                // Remove hidden from admin-view
+                if (adminView) {
+                    adminView.classList.remove('hidden');
+                    console.log('✅ admin-view shown');
+                }
 
                 if (warning) warning.classList.add('hidden');
-                if (controls) controls.classList.remove('hidden');
+                if (controls) {
+                    controls.classList.remove('hidden');
+                    console.log('✅ admin-controls shown');
+                }
 
                 const username = sessionStorage.getItem('username') || '';
                 const longName = sessionStorage.getItem('longName') || '';
                 if (currentUserEl) {
                     currentUserEl.textContent = username ? `${username} (${longName || '-'})` : 'ไม่ได้ล็อกอิน';
                 }
-
-                // Removed navigateTo('admin-view') to prevent infinite loop with MutationObserver
             }
 
             async function handleAdminLogin(event) {
@@ -3893,9 +3904,9 @@
 
                         hideAdminLoginModal();
 
-                        // Navigate to admin view using helper function
+                        // Navigate to admin view
                         showAdminView();
-                        if (typeof navigateTo === 'function') navigateTo('admin-view');
+                        showView('admin-view');
 
                         showMessageBox("✅ เข้าสู่ระบบผู้ดูแลสำเร็จ", `ยินดีต้อนรับ ${response.username}`);
                     } else {

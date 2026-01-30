@@ -3757,30 +3757,20 @@
 
             // Helper function to show admin view after successful login
             function showAdminView() {
-                console.log('🔧 showAdminView() called');
-
                 const warning = document.getElementById('admin-access-warning');
                 const controls = document.getElementById('admin-controls');
                 const currentUserEl = document.getElementById('admin-current-user');
-                const adminView = document.getElementById('admin-view');
-
-                // Remove hidden from admin-view
-                if (adminView) {
-                    adminView.classList.remove('hidden');
-                    console.log('✅ admin-view shown');
-                }
 
                 if (warning) warning.classList.add('hidden');
-                if (controls) {
-                    controls.classList.remove('hidden');
-                    console.log('✅ admin-controls shown');
-                }
+                if (controls) controls.classList.remove('hidden');
 
                 const username = sessionStorage.getItem('username') || '';
                 const longName = sessionStorage.getItem('longName') || '';
                 if (currentUserEl) {
                     currentUserEl.textContent = username ? `${username} (${longName || '-'})` : 'ไม่ได้ล็อกอิน';
                 }
+
+                // Removed navigateTo('admin-view') to prevent infinite loop with MutationObserver
             }
 
             async function handleAdminLogin(event) {
@@ -3904,9 +3894,9 @@
 
                         hideAdminLoginModal();
 
-                        // Navigate to admin view
+                        // Navigate to admin view using helper function
                         showAdminView();
-                        showView('admin-view');
+                        if (typeof navigateTo === 'function') navigateTo('admin-view');
 
                         showMessageBox("✅ เข้าสู่ระบบผู้ดูแลสำเร็จ", `ยินดีต้อนรับ ${response.username}`);
                     } else {
